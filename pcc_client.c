@@ -10,9 +10,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h> // for fstat
+#include <stdint.h> // for uint32_t, uint16_t
 
 
-#define MAX_BUFFER_SIZE 1024
+#define MAX_BUFFER_SIZE 16384 // 16 KB < 1MB
 
 
 int parse_args(int argc, char *argv[], struct sockaddr_in *server_addr, char **file_path) {
@@ -78,6 +80,28 @@ int transmit_data(int sockfd, int fd)
     char buffer[MAX_BUFFER_SIZE];
     ssize_t bytes_read;
 
+    // get file size
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+    perror("Error getting file size\n");
+    return -1;
+    }
+    uint32_t file_size_N = (uint32_t) st.st_size;
+
+    // transpose to network byte order
+    uint32_t net_file_size_N = htonl(file_size_N);
+
+    // send the file size first
+    size_t total_written = 0;
+    while (total_written < sizeof(net_file_size_N)) {
+        ssize_t n = write(sockfd,((char *)&net_file_size_N) + total_written,sizeof(net_file_size_N) - total_written);
+        if (n < 0) {
+            perror("Error writing file size to socket\n");
+            return -1;
+        }
+        total_written += n;
+    }
+
     while ((bytes_read = read(fd, buffer, sizeof(buffer))) > 0) {
         // starting a new buffer transmission
         ssize_t total_written = 0;
@@ -104,25 +128,27 @@ int transmit_data(int sockfd, int fd)
     return 0;
 }
 
-int receive_data(int sockfd, unsigned int *printable_count) {
-    char buffer[MAX_BUFFER_SIZE];
-    ssize_t bytes_received;
-    *printable_count = 0;
+int receive_data(int sockfd, uint32_t *printable_count) {
+    uint32_t result_net;
+    size_t total_read = 0;
 
-    // when socket is closed by the server, read() returns 0 (EOF)
-    while ((bytes_received = read(sockfd, buffer, sizeof(buffer))) > 0) {
-        for (ssize_t i = 0; i < bytes_received; i++) {
-            if (buffer[i] >= 32 && buffer[i] <= 126) {
-                (*printable_count)++;
-            }
+    // assumption: the number of printable characters is 4 bytes
+    // therefore, loop until we read 4 bytes into result_net
+    while (total_read < sizeof(result_net)) {
+        ssize_t ret = read(sockfd,((char *)&result_net) + total_read,sizeof(result_net) - total_read);
+        if (ret < 0) {
+            perror("Error reading result from server\n");
+            return -1;
         }
+        if (ret == 0) {
+            fprintf(stderr, "Connection closed before receiving complete result\n");
+            return -1;
+        }
+        total_read += ret;
     }
 
-    if (bytes_received < 0) {
-        perror("Error reading from socket\n");
-        return -1;
-    }
-
+    // convert from network byte order to host byte order
+    *printable_count = ntohl(result_net);
     return 0;
 }
 
@@ -133,7 +159,7 @@ int main(int argc, char *argv[]) {
     int ret;
     int fd;
     char *file_path;
-    unsigned int printable_count = 0;
+    uint32_t printable_count = 0;
 
     // server address structure - ip+port
     struct sockaddr_in server_addr;
@@ -170,8 +196,6 @@ int main(int argc, char *argv[]) {
 
     close(fd); // close the file descriptor after transmission is complete
 
-    // indicate the end of data transmission
-    shutdown(sockfd, SHUT_WR);
 
     // receive data from the TCP connection - checking for errors
     ret = receive_data(sockfd, &printable_count);
