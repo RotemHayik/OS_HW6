@@ -30,7 +30,10 @@ int parse_args(int argc, char *argv[], struct sockaddr_in *server_addr, char **f
     server_ip = argv[1];
     // converting a string containing an IP address to binary representation
     // assumption: valid IP address is provided
-    inet_pton(AF_INET, server_ip, &server_addr->sin_addr);
+    if(inet_pton(AF_INET, server_ip, &server_addr->sin_addr) <= 0) {
+        perror("Invalid IP address format");
+        return -1;
+    }
 
     // unsigned 16-bit integer for port number (given in host byte order)
     // assumption: valid port number is provided
@@ -50,7 +53,7 @@ int file_open(const char *file_path) {
     int fd;
     fd = open(file_path, O_RDONLY);
     if (fd < 0) {
-        perror("Error opening file\n");
+        perror("Error opening file");
         return -1;
     }
     return fd;
@@ -60,12 +63,12 @@ int TCP_connect(struct sockaddr_in *server_addr) {
     int sockfd;
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        perror("Error creating socket\n");
+        perror("Error creating socket");
         return -1;
     }
 
     if (connect(sockfd, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0) {
-        perror("Error connecting to server\n");
+        perror("Error connecting to server");
         close(sockfd);
         return -1;
     }
@@ -102,7 +105,7 @@ int transmit_data(int sockfd, int fd)
     while (total_written < sizeof(net_file_size_N)) {
         ssize_t n = write(sockfd,((char *)&net_file_size_N) + total_written,sizeof(net_file_size_N) - total_written);
         if (n < 0) {
-            perror("Error writing file size to socket\n");
+            perror("Error writing file size to socket");
             return -1;
         }
         total_written += n;
@@ -119,7 +122,7 @@ int transmit_data(int sockfd, int fd)
             // the number of remaining bytes
             ssize_t bytes_written = write(sockfd, buffer + total_written, bytes_read - total_written);
             if (bytes_written < 0) {
-                perror("Error writing to socket\n");
+                perror("Error writing to socket");
                 return -1;
             }
             total_written += bytes_written;
@@ -127,7 +130,7 @@ int transmit_data(int sockfd, int fd)
     }
 
     if (bytes_read < 0){
-        perror("Error reading from file\n");
+        perror("Error reading from file");
         return -1;}
 
     // if reached EOF, bytes_read == 0 and transmission is complete
@@ -143,7 +146,7 @@ int receive_data(int sockfd, uint32_t *printable_count) {
     while (total_read < sizeof(result_net)) {
         ssize_t ret = read(sockfd,((char *)&result_net) + total_read,sizeof(result_net) - total_read);
         if (ret < 0) {
-            perror("Error reading result from server\n");
+            perror("Error reading result from server");
             return -1;
         }
         if (ret == 0) {

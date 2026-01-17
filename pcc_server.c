@@ -46,7 +46,7 @@ int parse_args(int argc, char *argv[], struct sockaddr_in *server_addr) {
     uint16_t port;
     // argv[1] is the port number assumed to be a 16-bit unsigned integer
     if(sscanf(argv[1], "%hu", &port) != 1) {
-        perror("could not convert port number to 16 bit unsigned int\n");
+        perror("could not convert port number to 16 bit unsigned int");
         return -1;
     }
     server_addr->sin_port = htons(port);
@@ -60,26 +60,26 @@ void TCP_listen(struct sockaddr_in *server_addr, int *listenfd) {
 
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        perror("Error creating socket\n");
+        perror("Error creating socket");
         exit(1);
     }
         
     // set SO_REUSEADDR for a quick reuse of the address
     int opt = 1;
     if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        perror("Error in setsockopt\n");
+        perror("Error in setsockopt");
         close(sockfd);
         exit(1);
     }
 
     if (bind(sockfd, (struct sockaddr *)server_addr, sizeof(*server_addr)) < 0) {
-        perror("Error binding socket\n");
+        perror("Error binding socket");
         close(sockfd);
         exit(1);
     }
 
     if (listen(sockfd, 10) < 0) {
-        perror("Error listening on socket\n");
+        perror("Error listening on socket");
         close(sockfd);
         exit(1);
     }
