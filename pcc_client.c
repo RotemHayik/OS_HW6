@@ -3,8 +3,6 @@
 #include <netinet/in.h> // for struct sockaddr_in
 #include <stdio.h> // for printf, perror
 #include <stdlib.h> // for atoi, exit
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
