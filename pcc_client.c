@@ -79,15 +79,23 @@ int transmit_data(int sockfd, int fd)
     ssize_t bytes_read;
 
     // get file size
-    struct stat st;
-    if (fstat(fd, &st) < 0) {
-    perror("Error getting file size\n");
-    return -1;
-    }
-    uint32_t file_size_N = (uint32_t) st.st_size;
+   off_t file_size;
 
-    // transpose to network byte order
+    file_size = lseek(fd, 0, SEEK_END);
+    if (file_size < 0) {
+        perror("Error seeking to end of file");
+        return -1;
+    }
+
+    // return file offset back to start 
+    if (lseek(fd, 0, SEEK_SET) < 0) {
+        perror("Error returning to start of file");
+        return -1;
+    }
+
+    uint32_t file_size_N = (uint32_t) file_size;
     uint32_t net_file_size_N = htonl(file_size_N);
+
 
     // send the file size first
     size_t total_written = 0;

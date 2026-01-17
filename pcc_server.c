@@ -125,11 +125,10 @@ int client_connection(int listenfd) {
         size_t to_read = remaining < sizeof(buffer) ? remaining : sizeof(buffer);
 
         ssize_t bytes_read = read(connfd, buffer, to_read);
-        if (bytes_read < 0) {
-            perror("Error reading from connection\n");
-            close(connfd);
-            return CLIENT_FAILED;
+        if (bytes_read < 0 && errno == EINTR) {
+            continue;
         }
+
         if (bytes_read == 0) {
             fprintf(stderr, "Client disconnected before sending all data\n");
             close(connfd);
